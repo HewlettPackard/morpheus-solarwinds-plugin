@@ -1,24 +1,71 @@
-## Solarwinds IPAM
+# Morpheus SolarWinds IPAM Plugin
 
-This is the official Morpheus plugin for interacting with Solarwinds IPAM functionality. Automating functions with regards to IPAM services as well as DNS Services. This plugin syncs in configured subnets/pools, dns zones, dns resource records, and ip records for viewing directly in morpheus as well as manipulating when necessary. It also provides a way to attach a subnet/pool to a cloud network and automate the assignment and release of ipaddress resources for the workload being requested.
+This plugin provides an IPAM integration between [SolarWinds IP Address Manager](https://www.solarwinds.com/ip-address-manager) and [Morpheus](https://morpheusdata.com). It enables subnet sync, IP address sync, IP reservation, IP release, and hostname metadata updates from within the Morpheus platform.
 
-### Building
+## Requirements
 
-This is a Morpheus plugin that leverages the `morpheus-plugin-core` which can be referenced by visiting [https://developer.morpheusdata.com](https://developer.morpheusdata.com). It is a groovy plugin designed to be uploaded into a Morpheus environment via the `Administration -> Integrations -> Plugins` section. To build this product from scratch simply run the shadowJar gradle task on java 11:
+| Component | Minimum Version |
+|-----------|----------------|
+| Morpheus | 7.0.2 |
+
+## Installation
+
+1. Download the latest `.jar` from the [Releases](https://github.com/HewlettPackard/morpheus-solarwinds-plugin/releases) page, or [build it yourself](#building).
+2. In Morpheus, navigate to **Administration → Integrations → Plugins**.
+3. Click **Browse** and upload the `.jar` file.
+4. The **SolarWinds IPAM** integration type will appear after the plugin loads.
+
+## Configuration
+
+When adding a SolarWinds IPAM integration in Morpheus (**Infrastructure → Network → IPAM → Add IPAM Integration**), provide the following:
+
+| Field | Description |
+|-------|-------------|
+| **API Url** | SolarWinds Information Service endpoint, e.g. `https://x.x.x.x:17778`. |
+| **Credentials** | Morpheus username/password credential for SolarWinds. |
+| **Username** | Local username field used when not selecting a stored credential. |
+| **Password** | Local password field used when not selecting a stored credential. |
+| **Throttle Rate** | Optional API throttling rate for SolarWinds requests. |
+| **Disable SSL SNI Verification** | Disable SSL SNI verification for the SolarWinds endpoint. |
+| **Inventory Existing** | Import existing IP node records from synced subnets. |
+
+## Features
+
+### IPAM Sync
+The plugin registers an `IPAMProvider` for SolarWinds IPAM. The following resources are discovered and kept in sync from SolarWinds:
+
+- **Subnets** — SolarWinds `IPAM.Subnet` records as Morpheus network pools
+- **Network Ranges** — calculated pool ranges from each synced subnet CIDR
+- **IP Nodes** — SolarWinds `IPAM.IPNode` records when **Inventory Existing** is enabled
+- **Hostnames** — SolarWinds `DnsBackward` values as Morpheus IP hostnames
+- **IP Status** — SolarWinds IP node status mapped into Morpheus assigned, reserved, and transient records
+
+Any additions, updates, and removals in SolarWinds are reflected in Morpheus on the next IPAM refresh.
+
+### IP Reservation
+Morpheus can reserve addresses in synced SolarWinds subnets. Supported operations include:
+
+- Reserve the next available IP address with SolarWinds `StartIpReservation` and `FinishIpReservation`
+- Allocate a specific available IP address by changing its status to used
+- Store the SolarWinds `IpNodeId` on the Morpheus IP record
+- Update the SolarWinds `DNSBackward` field with the Morpheus hostname
+- Serialize allocation per network pool to avoid overlapping reservations
+
+### IP Release and Updates
+Morpheus host record lifecycle operations are mapped to SolarWinds IP nodes. Supported operations include:
+
+- Update SolarWinds `DNSBackward` when a hostname changes
+- Mark released addresses available with SolarWinds `ChangeIpStatus`
+- Keep Morpheus IP records synchronized with SolarWinds status and hostname changes
+
+## Building
 
 ```bash
 ./gradlew shadowJar
 ```
 
-A jar will be produced in the `build/lib` folder that can be uploaded into a Morpheus environment.
+The plugin JAR will be written to `build/libs/`.
 
+## License
 
-### Configuring
-
-Once the plugin is loaded in the environment. Efficient IP Becomes available in `Infrastructure -> Network -> Services`.
-
-When adding the integration simply enter the URL of the Efficient IP Server (no path is needed just the root url) and the credentials with sufficient enough privileges to talk to the API.
-
-### Thanks
-
-Thanks to EfficientIP for partnering with us and providing the information we needed to build this plugin.
+Copyright 2022 the original author or authors. Licensed under the [Apache License, Version 2.0](LICENSE).
