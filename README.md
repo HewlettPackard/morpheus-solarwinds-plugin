@@ -1,71 +1,122 @@
 # Morpheus SolarWinds IPAM Plugin
 
-This plugin provides an IPAM integration between [SolarWinds IP Address Manager](https://www.solarwinds.com/ip-address-manager) and [Morpheus](https://morpheusdata.com). It enables subnet sync, IP address sync, IP reservation, IP release, and hostname metadata updates from within the Morpheus platform.
+The Morpheus SolarWinds IPAM Plugin integrates Morpheus with SolarWinds IP Address Manager (IPAM) to provide IP address management within Morpheus. The plugin communicates with the SolarWinds Information Service (SWIS) API to reserve and release IP addresses from SolarWinds-managed subnets.
 
-## Requirements
+## Table of Contents
 
-| Component | Minimum Version |
-|-----------|----------------|
-| Morpheus | 7.0.2 |
+- [Features](#features)
+- [Requirements](#requirements)
+- [Repository structure](#repository-structure)
+- [Building the plugin](#building-the-plugin)
+- [License](#license)
+- [Installing](#installing)
+- [Detailed Usage Steps](#detailed-usage-steps)
+- [API Endpoints](#api-endpoints)
 
-## Installation
-
-1. Download the latest `.jar` from the [Releases](https://github.com/HewlettPackard/morpheus-solarwinds-plugin/releases) page, or [build it yourself](#building).
-2. In Morpheus, navigate to **Administration → Integrations → Plugins**.
-3. Click **Browse** and upload the `.jar` file.
-4. The **SolarWinds IPAM** integration type will appear after the plugin loads.
-
-## Configuration
-
-When adding a SolarWinds IPAM integration in Morpheus (**Infrastructure → Network → IPAM → Add IPAM Integration**), provide the following:
-
-| Field | Description |
-|-------|-------------|
-| **API Url** | SolarWinds Information Service endpoint, e.g. `https://x.x.x.x:17778`. |
-| **Credentials** | Morpheus username/password credential for SolarWinds. |
-| **Username** | Local username field used when not selecting a stored credential. |
-| **Password** | Local password field used when not selecting a stored credential. |
-| **Throttle Rate** | Optional API throttling rate for SolarWinds requests. |
-| **Disable SSL SNI Verification** | Disable SSL SNI verification for the SolarWinds endpoint. |
-| **Inventory Existing** | Import existing IP node records from synced subnets. |
+---
 
 ## Features
 
-### IPAM Sync
-The plugin registers an `IPAMProvider` for SolarWinds IPAM. The following resources are discovered and kept in sync from SolarWinds:
+### IP Address Management
 
-- **Subnets** — SolarWinds `IPAM.Subnet` records as Morpheus network pools
-- **Network Ranges** — calculated pool ranges from each synced subnet CIDR
-- **IP Nodes** — SolarWinds `IPAM.IPNode` records when **Inventory Existing** is enabled
-- **Hostnames** — SolarWinds `DnsBackward` values as Morpheus IP hostnames
-- **IP Status** — SolarWinds IP node status mapped into Morpheus assigned, reserved, and transient records
+Allocate and release IP addresses from SolarWinds IPAM subnets within Morpheus. Supports automatic next-available IP selection and existing inventory import. Note: this plugin manages IP addresses only; DNS management on SolarWinds is not implemented.
 
-Any additions, updates, and removals in SolarWinds are reflected in Morpheus on the next IPAM refresh.
+### Cloud Sync
 
-### IP Reservation
-Morpheus can reserve addresses in synced SolarWinds subnets. Supported operations include:
+Morpheus synchronises the following SolarWinds resources for inventory:
 
-- Reserve the next available IP address with SolarWinds `StartIpReservation` and `FinishIpReservation`
-- Allocate a specific available IP address by changing its status to used
-- Store the SolarWinds `IpNodeId` on the Morpheus IP record
-- Update the SolarWinds `DNSBackward` field with the Morpheus hostname
-- Serialize allocation per network pool to avoid overlapping reservations
+- IPAM subnets as Morpheus network pools
+- IP node allocations
 
-### IP Release and Updates
-Morpheus host record lifecycle operations are mapped to SolarWinds IP nodes. Supported operations include:
+---
 
-- Update SolarWinds `DNSBackward` when a hostname changes
-- Mark released addresses available with SolarWinds `ChangeIpStatus`
-- Keep Morpheus IP records synchronized with SolarWinds status and hostname changes
+## Requirements
 
-## Building
+| Requirement | Version |
+|-------------|---------|
+| Morpheus | 7.0.2 or later |
+| Java | 11 or later |
+| Gradle | Use the included Gradle wrapper (`./gradlew`) |
 
-```bash
-./gradlew shadowJar
+Additional prerequisites:
+
+- A running SolarWinds Orion platform with the IPAM module and the Information Service (SWIS) REST API accessible from the Morpheus appliance (default port: 17778 over HTTPS)
+- A SolarWinds user account with read/write access to IPAM objects
+- Network access from the Morpheus appliance to the SolarWinds Orion server on port 17778
+
+---
+
+## Repository structure
+
+```
+src/main/groovy/com/morpheusdata/solarwinds/
+├── SolarWindsPlugin.groovy    - Plugin entry point; registers SolarWindsProvider
+└── SolarWindsProvider.groovy  - IPAMProvider implementation; IPAM operations, sync, OptionTypes
+build.gradle, gradle.properties - Build configuration and plugin metadata
 ```
 
-The plugin JAR will be written to `build/libs/`.
+---
+
+## Building the plugin
+
+Run the following command to compile and package the plugin jar:
+
+```bash
+./gradlew clean build
+```
+
+The packaged jar will be written to `build/libs/`.
+
+To execute tests, use the following command:
+
+```bash
+./gradlew test
+```
+
+---
 
 ## License
 
-Copyright 2022 the original author or authors. Licensed under the [Apache License, Version 2.0](LICENSE).
+This project is licensed under the Apache License 2.0.
+
+See the [LICENSE](LICENSE) file for details.
+
+---
+
+## Installing
+
+1. Build the plugin (see [Building the plugin](#building-the-plugin)) or download a released jar.
+2. In Morpheus, navigate to **Administration > Integrations > Plugins**.
+3. Click **Add** and upload the `morpheus-solarwinds-plugin-<version>.jar` from `build/libs/`.
+4. Navigate to **Infrastructure > Networks > IP Pools > Add** and select **SolarWinds** to configure the integration.
+
+---
+
+## Detailed Usage Steps
+
+### Adding a SolarWinds IPAM Integration
+
+1. Go to **Infrastructure > Networks > IP Pools > Add**.
+2. Select **SolarWinds** as the pool server type.
+3. Enter the **API Url** (e.g. `https://solarwinds.example.com:17778`), **Username**, and **Password**.
+4. Optionally configure **Throttle Rate** and **Disable SSL SNI Verification**.
+5. Save. Morpheus connects to the SWIS API and syncs available IPAM subnets as network pools.
+
+### Allocating an IP Address
+
+When provisioning an instance on a network backed by a SolarWinds subnet, Morpheus reserves the next available IP by updating the corresponding IP node record in SolarWinds IPAM.
+
+### Releasing an IP Address
+
+When an instance is decommissioned, Morpheus updates the IP node record in SolarWinds to mark it as available again.
+
+---
+
+## API Endpoints
+
+This plugin communicates with the **SolarWinds Information Service (SWIS) REST API** at `https://<solarwinds-host>:17778`. Authentication uses HTTP Basic credentials.
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/SolarWinds/InformationService/v3/Json/Query` | GET/POST | SWQL query for subnets and IP nodes |
+| `/SolarWinds/InformationService/v3/Json/swis://{host}/Orion/IPAM.IPNode/IpNodeId={id}` | PUT | Reserve or release an IP address |
